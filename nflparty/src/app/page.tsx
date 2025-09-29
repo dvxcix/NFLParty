@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -14,9 +14,25 @@ interface Game {
   home_team: string;
   away_team: string;
   commence_time: string;
+  bookmakers?: Bookmaker[];
 }
 
-interface OddsData {
+interface Bookmaker {
+  key: string;
+  markets: BookmakerMarket[];
+}
+
+interface BookmakerMarket {
+  key: string;
+  outcomes: Array<{
+    description?: string;
+    name: string;
+    point?: number;
+    price: number;
+  }>;
+}
+
+interface HistoryData {
   created_at: string;
   price: number;
   point: number | null;
@@ -35,7 +51,6 @@ export default function Dashboard() {
   const [availableMarkets, setAvailableMarkets] = useState<Set<string>>(new Set());
   const [selectedMarket, setSelectedMarket] = useState<string>('');
   const [chartData, setChartData] = useState<ChartSeries[]>([]);
-  const [rawOdds, setRawOdds] = useState<any[]>([]); // Store full current odds for market/players
 
   useEffect(() => {
     fetchGames();
@@ -43,9 +58,8 @@ export default function Dashboard() {
 
   async function fetchGames() {
     const response = await fetch('/api/current-odds');
-    const data = await response.json();
-    setRawOdds(data);
-    const todayGames = data.filter((game: any) => {
+    const data: Game[] = await response.json();
+    const todayGames = data.filter((game: Game) => {
       const commence = new Date(game.commence_time);
       const today = new Date();
       return commence.getDate() === today.getDate() && commence.getMonth() === today.getMonth() && commence.getFullYear() === today.getFullYear();
@@ -55,7 +69,7 @@ export default function Dashboard() {
     const playersMap: Record<string, Set<string>> = {};
     const marketsSet = new Set<string>();
     for (const game of todayGames) {
-      const bookmakerData = game.bookmakers?.find((b: any) => b.key === 'draftkings');
+      const bookmakerData = game.bookmakers?.find((b: Bookmaker) => b.key === 'draftkings');
       if (bookmakerData) {
         const gamePlayers = new Set<string>();
         for (const market of bookmakerData.markets) {
@@ -90,11 +104,7 @@ export default function Dashboard() {
     // Chart updates when market changes or players change
   }
 
-  useEffect(() => {
-    if (selectedMarket) updateChart();
-  }, [selectedMarket, selectedPlayers]);
-
-  async function updateChart() {
+  const updateChart = useCallback(async () => {
     const newChartData: ChartSeries[] = [];
     for (const key of selectedPlayers) {
       const [player, gameId] = key.split('@');
@@ -111,7 +121,7 @@ export default function Dashboard() {
       if (history && history.length > 0) {
         // If multiple points, group by point
         const groupedByPoint: Record<string, { time: string; price: number; point: number | null }[]> = {};
-        for (const h of history) {
+        for (const h of history as HistoryData[]) {
           const pointKey = h.point !== null ? h.point.toString() : 'none';
           if (!groupedByPoint[pointKey]) groupedByPoint[pointKey] = [];
           groupedByPoint[pointKey].push({
@@ -130,7 +140,11 @@ export default function Dashboard() {
       }
     }
     setChartData(newChartData);
-  }
+  }, [selectedMarket, selectedPlayers]);
+
+  useEffect(() => {
+    if (selectedMarket) updateChart();
+  }, [selectedMarket, selectedPlayers, updateChart]);
 
   return (
     <div className="p-4">
