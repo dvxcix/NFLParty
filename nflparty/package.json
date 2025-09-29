@@ -24,4 +24,10 @@
     "eslint-config-next": "15.5.4",
     "@eslint/eslintrc": "^3"
   }
+  {
+  // ... your existing content ...
+  "overrides": {
+    "react-is": "^19.1.1"
+  }
+}
 }
