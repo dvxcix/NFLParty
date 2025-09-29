@@ -199,6 +199,7 @@ export default function Dashboard() {
             <XAxis dataKey="time" />
             <YAxis domain={['auto', 'auto']} />
             <Tooltip formatter={(value, name, props) => [`Price: ${value}`, `Point: ${props.payload.point ?? 'N/A'}`]} />
+            // @ts-ignore
             <Legend />
             {chartData.map((series, idx) => (
               <Line
